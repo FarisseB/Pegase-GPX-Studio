@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pégase Moto & Flashbird — GPX Studio & Télémétrie</title>
+  
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  
+  <!-- Leaflet CSS for Maps -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  
+  <!-- Application Stylesheet -->
+  <link rel="stylesheet" href="styles.css">
+
+  <!-- JSZip & FileSaver for bulk GPX download -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- Chart.js for Interactive Telemetry Profiles -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div class="ambient-glow"></div>
+  <div class="ambient-glow-2"></div>
+
+  <!-- Header -->
+  <header>
+    <div class="logo-area">
+      <div class="logo-icon">
+        <svg viewBox="0 0 24 24">
+          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+        </svg>
+      </div>
+      <div>
+        <div class="brand-title">Pégase <span>GPX Studio</span> <span class="brand-badge">Client Direct</span></div>
+      </div>
+    </div>
+
+    <div class="header-actions" id="headerActions" style="display: none;">
+      <div id="deviceBadge" class="pill pill-amber">🏍️ Moto connectée</div>
+      <div id="syncBadge" class="pill pill-emerald" style="display: none; font-size: 0.75rem;" title="Base de données locale sauvegardée sur votre machine">💾 Base locale</div>
+      <button class="btn btn-secondary btn-sm" id="btnRefresh" title="Vérifier uniquement les nouveaux trajets récents (ultra-rapide)">🔄 Synchroniser</button>
+      <button class="btn btn-secondary btn-sm" id="btnFullResync" title="Re-télécharger l'intégralité des 3000+ trajets depuis les serveurs Pégase" style="font-size: 0.75rem; opacity: 0.9;">📥 Re-synchro complète</button>
+      <button class="btn btn-danger btn-sm" id="btnLogout">Déconnexion</button>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="main-container">
+
+    <!-- LOGIN SECTION -->
+    <section id="loginSection" class="login-wrapper">
+      <div class="login-header">
+        <h2>Connexion Pégase</h2>
+        <p>Accédez directement à vos données de télémétrie et exportez vos balades en GPX.</p>
+      </div>
+
+      <div id="loginError" style="display: none; padding: 10px 14px; background: rgba(244,63,94,0.15); border: 1px solid rgba(244,63,94,0.3); border-radius: 8px; color: #fb7185; font-size: 0.85rem; margin-bottom: 18px;"></div>
+
+      <form id="loginForm">
+        <div class="form-group">
+          <label for="inputEmail">Adresse Email Pégase</label>
+          <input type="email" id="inputEmail" class="form-control" placeholder="votre-email@example.com" required autocomplete="username">
+        </div>
+
+        <div class="form-group">
+          <label for="inputPassword">Mot de passe</label>
+          <input type="password" id="inputPassword" class="form-control" placeholder="••••••••••••" required autocomplete="current-password">
+        </div>
+
+        <div class="form-group">
+          <label class="form-check">
+            <input type="checkbox" id="checkRemember" checked>
+            <span>Mémoriser le jeton sur cet ordinateur</span>
+          </label>
+        </div>
+
+        <button type="submit" id="btnSubmitLogin" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 12px; margin-top: 6px;">
+          Se connecter au traceur
+        </button>
+      </form>
+
+      <div class="privacy-notice">
+        <span style="font-size: 1.1rem;">🔒</span>
+        <div>
+          <strong>Confidentialité garantie :</strong> Vos identifiants ne sont ni enregistrés ni relayés par un tiers. Cette page contacte directement l'API officielle de SMT Performances (<code>pegase.api-smt.ovh</code>) depuis votre propre navigateur.
+        </div>
+      </div>
+    </section>
+
+    <!-- DASHBOARD SECTION (Hidden by default) -->
+    <section id="dashboardSection" style="display: none;">
+
+      <!-- Telemetry Cards -->
+      <div class="dashboard-grid">
+        <!-- Battery Card -->
+        <div class="stat-card">
+          <div class="stat-head">
+            <span class="stat-title">Batterie Moto</span>
+            <div class="stat-icon" style="color: #10b981;">⚡</div>
+          </div>
+          <div class="stat-value" id="valBatteryVoltage">-- <span class="stat-unit">V</span></div>
+          <div class="stat-footer">
+            <span id="badgeBatteryHealth" class="pill pill-emerald">En forme</span>
+            <span id="valBatteryDate">Relevé récent</span>
+          </div>
+        </div>
+
+        <!-- Antitheft Card -->
+        <div class="stat-card">
+          <div class="stat-head">
+            <span class="stat-title">Statut Antivol</span>
+            <div class="stat-icon" style="color: #f59e0b;">🛡️</div>
+          </div>
+          <div class="stat-value" id="valLockStatus" style="font-size: 1.4rem;">--</div>
+          <div class="stat-footer">
+            <span id="badgeLockPill" class="pill pill-amber">Surveillance</span>
+            <span id="valVehicleStatus">Traceur actif</span>
+          </div>
+        </div>
+
+        <!-- Location Card -->
+        <div class="stat-card">
+          <div class="stat-head">
+            <span class="stat-title">Dernière Position</span>
+            <div class="stat-icon" style="color: #38bdf8;">📍</div>
+          </div>
+          <div class="stat-value" id="valCoordinates" style="font-size: 1.1rem; font-family: 'JetBrains Mono', monospace;">--</div>
+          <div class="stat-footer">
+            <span class="pulse-dot"></span>
+            <span id="valGpsTimestamp">Date inconnue</span>
+          </div>
+        </div>
+
+        <!-- Total Rides Card -->
+        <div class="stat-card">
+          <div class="stat-head">
+            <span class="stat-title">Historique Trajets</span>
+            <div class="stat-icon" style="color: #a855f7;">🏍️</div>
+          </div>
+          <div class="stat-value" id="valTotalRidesCount">0 <span class="stat-unit">trajets</span></div>
+          <div class="stat-footer">
+            <span id="valTotalDistance">0 km cumulés</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Map View -->
+      <div class="map-card" id="mapCard">
+        <div class="map-header">
+          <div class="map-title">
+            <span>🗺️</span> Emplacement & Visualisation du tracé
+            <span id="currentTraceTitle" style="font-weight: 400; color: var(--accent-orange); font-size: 0.85rem; margin-left: 10px;"></span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <button class="btn btn-secondary btn-sm" id="btnScrollToActiveRide" style="display: none;" title="Faire défiler la liste jusqu'à ce trajet">🎯 Voir dans la liste</button>
+            <button class="btn btn-secondary btn-sm" id="btnCenterMoto">Centrer sur la moto</button>
+            <button class="btn btn-secondary btn-sm" id="btnExpandMap" title="Agrandir la hauteur de la carte (380px ➔ 650px)">↕️ Agrandir</button>
+            <button class="btn btn-secondary btn-sm" id="btnFullscreenMap" title="Afficher la carte en plein écran immersif">⛶ Plein écran</button>
+          </div>
+        </div>
+        <div id="map"></div>
+
+        <!-- COCKPIT TÉLÉMÉTRIE DU TRAJET (affiché au clic sur "Voir") -->
+        <div id="rideTelemetryCockpit" class="telemetry-cockpit" style="display: none;">
+          <div class="cockpit-header">
+            <div class="cockpit-title">
+              <span class="cockpit-pulse"></span>
+              <strong>Cockpit Télémétrie</strong>
+              <span id="cockpitRideName" class="cockpit-ridename"></span>
+            </div>
+            <div class="cockpit-actions" style="display: flex; align-items: center; gap: 8px;">
+              <button class="btn btn-secondary btn-sm" id="btnCockpitScrollToList" title="Faire défiler la page et repérer ce trajet dans le tableau" style="font-size: 0.78rem;">🎯 Repérer dans la liste</button>
+              <button class="btn btn-secondary btn-sm" id="btnCloseCockpit" title="Masquer le cockpit">✕ Fermer</button>
+            </div>
+          </div>
+
+          <!-- 4 KPI Cards -->
+          <div class="cockpit-grid">
+            <!-- Vitesse Max & Moyenne -->
+            <div class="cockpit-kpi-card">
+              <div class="kpi-icon-wrap kpi-blue">⚡</div>
+              <div class="kpi-data">
+                <span class="kpi-label">Vitesse Maximale</span>
+                <div class="kpi-value"><span id="kpiMaxSpeed">--</span> <small>km/h</small></div>
+                <div class="kpi-sub" id="kpiAvgSpeed">Moyenne: -- km/h</div>
+              </div>
+            </div>
+
+            <!-- Freinage Max (en G) -->
+            <div class="cockpit-kpi-card">
+              <div class="kpi-icon-wrap kpi-rose">🛑</div>
+              <div class="kpi-data">
+                <span class="kpi-label">Freinage Maximum</span>
+                <div class="kpi-value" style="color: #fb7185;"><span id="kpiMaxBraking">--</span> <small>G</small></div>
+                <div class="kpi-sub" id="kpiBrakingLabel">Décélération crête</div>
+              </div>
+            </div>
+
+            <!-- Accélération Max (en G) -->
+            <div class="cockpit-kpi-card">
+              <div class="kpi-icon-wrap kpi-emerald">🚀</div>
+              <div class="kpi-data">
+                <span class="kpi-label">Accélération Max</span>
+                <div class="kpi-value" style="color: #34d399;"><span id="kpiMaxAccel">--</span> <small>G</small></div>
+                <div class="kpi-sub" id="kpiAccelLabel">Relance moteur</div>
+              </div>
+            </div>
+
+            <!-- Prise d'Angle Max -->
+            <div class="cockpit-kpi-card">
+              <div class="kpi-icon-wrap kpi-amber">📐</div>
+              <div class="kpi-data">
+                <span class="kpi-label">Angle d'Inclinaison</span>
+                <div class="kpi-value" style="color: #fbbf24;"><span id="kpiMaxTilt">--</span><small>°</small></div>
+                <div class="kpi-sub" id="kpiTiltDetail">⬅️ --° &nbsp;|&nbsp; --° ➡️</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section Graphique Synchronisé -->
+          <div class="cockpit-chart-section">
+            <div class="chart-toolbar">
+              <span class="chart-toolbar-title">📈 Profil Dynamique sur le Parcours</span>
+              <div class="chart-toggle-group">
+                <button type="button" class="chart-toggle-btn active" data-metric="speed">⚡ Vitesse</button>
+                <button type="button" class="chart-toggle-btn" data-metric="braking">🛑 Freinage & Accél.</button>
+                <button type="button" class="chart-toggle-btn" data-metric="tilt">📐 Prise d'angle</button>
+              </div>
+            </div>
+            <div class="chart-canvas-container">
+              <canvas id="telemetryChart"></canvas>
+            </div>
+            <div class="chart-hint">💡 <em>Survolez le graphique pour déplacer le repère en direct sur la carte GPS.</em></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Rides Section -->
+      <div class="rides-section">
+        <div class="rides-toolbar">
+          <div class="toolbar-left">
+            <input type="text" id="filterInput" class="search-input" placeholder="🔍 Rechercher (nom, ville)...">
+
+            <!-- Type / Distance filter -->
+            <select id="selectTripFilter" class="filter-select" title="Filtrer par type de trajet ou distance">
+              <option value="all">🛣️ Tous les trajets</option>
+              <option value="rides_1km" selected>🏍️ Balades uniquement (&gt; 1 km)</option>
+              <option value="rides_10km">🚀 Belles virées (&gt; 10 km)</option>
+              <option value="rides_50km">🏁 Grands voyages (&gt; 50 km)</option>
+              <option value="parking_only">⚠️ Dérives parking (&lt; 1 km ou &lt; 50 pts)</option>
+            </select>
+
+            <!-- Vitesse Max filter -->
+            <select id="selectSpeedFilter" class="filter-select" title="Filtrer par Vitesse Max">
+              <option value="all">⚡ Vitesse : Toutes</option>
+              <option value="speed_50">⚡ Vitesse max &gt; 50 km/h</option>
+              <option value="speed_90">⚡ Vitesse max &gt; 90 km/h</option>
+              <option value="speed_130">⚡ Vitesse max &gt; 130 km/h</option>
+            </select>
+
+            <!-- Tri Bidirectionnel -->
+            <select id="selectSort" class="filter-select" title="Ordre de tri des trajets">
+              <option value="date_desc">📅 Date : Plus récents (▼)</option>
+              <option value="date_asc">📅 Date : Plus anciens (▲)</option>
+              <option value="maxSpeed_desc">⚡ Vitesse Max : La plus rapide (▼)</option>
+              <option value="maxSpeed_asc">⚡ Vitesse Max : La plus lente (▲)</option>
+              <option value="distance_desc">🛣️ Distance : La plus longue (▼)</option>
+              <option value="distance_asc">🛣️ Distance : La plus courte (▲)</option>
+              <option value="duration_desc">⏱️ Durée : La plus longue (▼)</option>
+              <option value="duration_asc">⏱️ Durée : La plus courte (▲)</option>
+              <option value="avgSpeed_desc">🏎️ Vitesse Moy. : Plus rapide (▼)</option>
+              <option value="avgSpeed_asc">🏎️ Vitesse Moy. : Plus lente (▲)</option>
+              <option value="points_desc">📍 Points GPS : Plus nombreux (▼)</option>
+              <option value="points_asc">📍 Points GPS : Moins nombreux (▲)</option>
+              <option value="name_asc">🔤 Nom : Alphabétique (A ➔ Z)</option>
+              <option value="name_desc">🔤 Nom : Inverse (Z ➔ A)</option>
+            </select>
+
+            <label class="form-check" style="margin-left: 6px;">
+              <input type="checkbox" id="checkSelectAll">
+              <span style="font-weight: 600;">Tout sélectionner</span>
+            </label>
+
+            <div id="selectionBadge" class="selection-counter" style="display: none;">0 trajet sélectionné</div>
+            <div id="ridesLoadingStatus" class="pill pill-amber" style="display: none; font-size: 0.78rem;">📥 Chargement de l'historique...</div>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <button class="btn btn-secondary btn-sm" id="btnPrefetchSpeeds" title="Calculer ou mettre à jour les vitesses maximales de tous les trajets">
+              ⚡ Calculer les vitesses (<span id="speedProgressCount">0/0</span>)
+            </button>
+            <button class="btn btn-primary" id="btnDownloadSelected" disabled>
+              📥 Télécharger les trajets sélectionnés
+            </button>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table id="ridesTable">
+            <thead>
+              <tr>
+                <th style="width: 40px; text-align: center;"></th>
+                <th class="sortable" data-sort="date" title="Cliquer pour trier du plus récent au plus ancien ou inversement">Date & Heure <span class="sort-icon">⇅</span></th>
+                <th class="sortable" data-sort="name" title="Cliquer pour trier par ordre alphabétique (A-Z ou Z-A)">Trajet / Parcours <span class="sort-icon">⇅</span></th>
+                <th class="sortable" data-sort="distance" title="Cliquer pour trier du plus long au plus court ou inversement">Distance <span class="sort-icon">⇅</span></th>
+                <th class="sortable" data-sort="duration" title="Cliquer pour trier de la plus longue à la plus courte durée ou inversement">Durée <span class="sort-icon">⇅</span></th>
+                <th class="sortable" data-sort="avgSpeed" title="Cliquer pour trier par vitesse moyenne">Vitesse Moy. <span class="sort-icon">⇅</span></th>
+                <th class="sortable" data-sort="maxSpeed" style="color: #fbbf24;" title="Cliquer pour trier de la vitesse max la plus élevée à la plus basse ou inversement">Vitesse Max ⚡ <span class="sort-icon">⇅</span></th>
+                <th class="sortable" data-sort="points" title="Cliquer pour trier par nombre de points GPS enregistrés">Points GPS <span class="sort-icon">⇅</span></th>
+                <th style="text-align: right;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="ridesTableBody">
+              <tr>
+                <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 40px;">
+                  Chargement de vos trajets...
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- DOWNLOAD PROGRESS MODAL -->
+  <div class="modal-overlay" id="progressModal">
+    <div class="modal-card">
+      <h3 id="modalTitle" style="font-size: 1.2rem; margin-bottom: 8px;">Téléchargement en cours...</h3>
+      <p id="modalStatus" style="color: var(--text-muted); font-size: 0.85rem;">Récupération des coordonnées GPS des balades...</p>
+      
+      <div class="progress-bar-container">
+        <div class="progress-bar-fill" id="progressBarFill"></div>
+      </div>
+
+      <div id="modalPercent" style="font-weight: 700; font-family: 'JetBrains Mono', monospace; font-size: 0.95rem; color: #fbbf24;">0%</div>
+    </div>
+  </div>
+
+  <!-- Application Modules (order matters: config → api → utils → map → rides → gpx → auth → app) -->
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/rides.js"></script>
+  <script src="js/cockpit.js"></script>
+  <script src="js/gpx.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
