@@ -94,7 +94,13 @@ L'application ne nécessite **aucun serveur, aucun logiciel externe (pas de Node
 
 ---
 
-## 🏗️ Architecture Modulaire
+## 🏗️ Architecture & Flux des Données
+
+<div align="center">
+  <img src="images/flux_donnees.svg" alt="Architecture et Cheminement Réel des Données Pégase GPX Studio" width="100%" style="border-radius: 8px; margin: 15px 0;" />
+</div>
+
+### 📁 Organisation Modulaire du Code Source
 
 Le code est entièrement découpé en modules légers et lisibles pour faciliter la personnalisation et la maintenance :
 
@@ -102,7 +108,8 @@ Le code est entièrement découpé en modules légers et lisibles pour faciliter
 Pegase_Manager/
 ├── index.html            — Structure HTML épurée (aucun script inline)
 ├── styles.css            — Design system complet (dark theme, glassmorphism, responsive)
-├── images/               — Captures d'écran et illustrations du projet
+├── images/               — Schémas d'architecture et captures d'écran
+│   ├── flux_donnees.svg
 │   ├── cockpit_carte.png
 │   ├── profil_dynamique.png
 │   └── tableau_trajets.png
