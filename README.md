@@ -166,3 +166,10 @@ L'outil est 100% universel et fonctionne avec toutes les motos et cylindrées é
 ## 🏷️ Mots-Clés / Tags
 
 `pegase-moto` • `flashbird` • `smt-performances` • `motorcycle` • `moto` • `traceur-gps` • `gps-tracker` • `telemetry` • `telemetrie` • `gpx` • `gpx-exporter` • `leaflet` • `chartjs` • `local-first` • `privacy-focused` • `france` • `belgique` • `kawasaki` • `yamaha` • `honda` • `bmw-motorrad` • `ducati` • `ktm` • `triumph`
+
+---
+
+## ⚖️ Avertissement & Mentions Légales
+
+Ce projet est un outil tiers indépendant et open source développé pour la communauté motarde. Il n'est **ni affilié, ni sponsorisé, ni soutenu par la société SMT Performances**. *Pégase Moto* et *Flashbird* sont des marques déposées de SMT Performances.
+
