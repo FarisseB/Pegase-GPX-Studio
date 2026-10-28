@@ -94,7 +94,54 @@ L'application ne nécessite **aucun serveur, aucun logiciel externe (pas de Node
 
 ---
 
-## 🏗️ Architecture Modulaire
+## 🏗️ Architecture & Flux des Données
+
+Voici comment circulent vos données de télémétrie, depuis votre moto jusqu'à vos exports GPX (garantie **100% locale, sans serveur intermédiaire**) :
+
+```mermaid
+flowchart TD
+    subgraph Moto["🏍️ Moto & Boîtier GPS"]
+        B["Boîtier Pégase (2G) ou Flashbird (4G)<br/>• GPS haute précision 10 Hz & Accéléromètre 3D<br/>• Diagnostic batterie 12V & Alarme antivol"]
+    end
+
+    subgraph SMT["☁️ Serveurs Officiels SMT Performances"]
+        API["API GraphQL Sécurisée<br/>https://pegase.api-smt.ovh/graphql"]
+    end
+
+    subgraph App["💻 Pégase GPX Studio (100% Navigateur Local)"]
+        direction TB
+        Auth["🔐 Authentification Directe<br/>(Jeton de session stocké localement)"]
+        Fetch["🔌 Client API GraphQL<br/>(Synchronisation incrémentale intelligente)"]
+        Storage[("💾 Base de Données Locale sur votre PC<br/>(localStorage - Démarrage instantané 0 ms)")]
+        Engine["⚡ Moteur de Calcul Télémétrique<br/>• Vitesses max réelles & moyennes<br/>• Décélération & Accélération en G<br/>• Angle d'inclinaison D/G en degrés"]
+        
+        UI["🖥️ Interface Utilisateur Interactive<br/>• 🗺️ Carte Leaflet (Modes Agrandir 650px & Plein écran)<br/>• 📈 Courbe dynamique Chart.js synchronisée<br/>• 📋 Tableau avec tri bidirectionnel instantané & filtres"]
+        
+        GPX["📥 Moteur d'Export GPX 1.1 Enrichi<br/>(Balises de vitesse, angle, G-Force + ZIP)"]
+    end
+
+    subgraph Usage["🎬 Exploitation & Compteurs Vidéo"]
+        Video["Incrustation de compteurs moto sur vidéo<br/>(Garmin VIRB Edit, DashWare, RaceRender)"]
+        GPSFiles["Fichiers .GPX individuels & Archives .ZIP"]
+    end
+
+    B -->|"Réseau GSM 2G / 4G LTE-M"| API
+    API <-->|"HTTPS Direct (Aucun serveur tiers)"| Fetch
+    Auth --> Fetch
+    Fetch --> Storage
+    Storage --> Engine
+    Engine --> UI
+    UI --> GPX
+    GPX --> GPSFiles
+    GPSFiles --> Video
+
+    style Moto fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style SMT fill:#1e293b,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style App fill:#0f172a,stroke:#10b981,stroke-width:2px,color:#fff
+    style Usage fill:#1e293b,stroke:#8b5cf6,stroke-width:2px,color:#fff
+```
+
+### 📁 Organisation du Code Source
 
 Le code est entièrement découpé en modules légers et lisibles pour faciliter la personnalisation et la maintenance :
 
